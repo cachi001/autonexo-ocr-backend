@@ -371,6 +371,22 @@ _LABELS = {
 }
 
 _PATENTE_RE = re.compile(r"\b([A-Z]{2}\s?\d{3}\s?[A-Z]{2}|[A-Z]{3}\s?\d{3})\b")
+# Patente PARCIAL: acepta que falten letras/dígitos al final. Hace falta
+# porque en una foto real la patente puede quedar tapada a la mitad (otro
+# papel encima, un dedo, un reflejo) -> con el patrón completo esa parte
+# visible se perdía entera en vez de mostrarse como dato parcial.
+_PATENTE_PARCIAL_RE = re.compile(r"\b([A-Z]{2}\d{1,3}|[A-Z]{3}\d{1,3})\b")
+
+
+def _candidato_patente(texto: str) -> str | None:
+    """Busca forma de patente (completa primero, parcial si no hay) en un
+    fragmento de texto ya leído por el OCR."""
+    t = texto.upper().replace(" ", "")
+    m = _PATENTE_RE.search(t)
+    if m:
+        return m.group(1).replace(" ", "")
+    m = _PATENTE_PARCIAL_RE.search(t)
+    return m.group(1) if m else None
 
 
 def _strip_accents(s: str) -> str:
@@ -411,7 +427,15 @@ def map_fields(ocr_lines: list[str]) -> dict:
     """Para cada línea leída por el OCR, busca a qué etiqueta de campo se parece
     más (tolerando errores de OCR en la propia etiqueta). Si la línea trae la
     etiqueta y el valor juntos ("MARCA ZANELLA") separa por palabras; si la
-    línea es solo la etiqueta, el valor se busca en la línea siguiente."""
+    línea es solo la etiqueta, el valor se busca en la línea siguiente.
+
+    "dominio" es un caso aparte: el OCR no siempre devuelve las líneas en el
+    mismo orden en que aparecen visualmente en la cédula (depende de cómo
+    quedó la foto/el warp), así que asumir "el valor viene en la línea de
+    después de la etiqueta" fallaba en fotos reales -> se descarta cualquier
+    "valor" que no tenga forma de patente (ver _candidato_patente) y, si no
+    se encontró nada pegado a la etiqueta, se busca en una ventana de líneas
+    alrededor (antes Y después), no solo la siguiente."""
     campos: dict[str, str] = {}
     usados: set[str] = set()
 
@@ -426,18 +450,36 @@ def map_fields(ocr_lines: list[str]) -> dict:
         # pega la etiqueta y el valor sin espacio ("MODELO:SAPUCAI 150 F"), y
         # cortar por palabras se comía la primera palabra del valor
         resto = raw_line[len(label):].lstrip(" :.-").strip()
-        if not resto and i + 1 < len(ocr_lines):
+
+        if campo == "dominio":
+            if resto and not _candidato_patente(resto):
+                resto = ""  # lo que sigue a la etiqueta no tiene forma de patente -> es ruido
+            if not resto:
+                ventana = [
+                    ocr_lines[j]
+                    for j in range(max(0, i - 2), min(len(ocr_lines), i + 3))
+                    if j != i
+                ]
+                mejor = None
+                for linea in ventana:
+                    cand = _candidato_patente(linea)
+                    if cand and (mejor is None or len(cand) > len(mejor)):
+                        mejor = cand
+                resto = mejor or ""
+        elif not resto and i + 1 < len(ocr_lines):
             resto = ocr_lines[i + 1].strip(" :.-")
 
         if resto:
             campos[campo] = resto
             usados.add(campo)
 
-    # la patente suele reconocerse mejor por patrón que por etiqueta, cuando el OCR no la corrompe
-    full_text = " ".join(ocr_lines).upper()
-    m = _PATENTE_RE.search(full_text)
-    if m and not campos.get("dominio"):
-        campos["dominio"] = m.group(1).replace(" ", "")
+    # si ninguna etiqueta "dominio"/"patente" matcheó, última red: buscar la
+    # forma de patente (completa o parcial) en cualquier parte del texto
+    if not campos.get("dominio"):
+        full_text = " ".join(ocr_lines).upper()
+        cand = _candidato_patente(full_text)
+        if cand:
+            campos["dominio"] = cand
 
     return campos
 
