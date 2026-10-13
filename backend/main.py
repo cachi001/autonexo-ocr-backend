@@ -322,6 +322,14 @@ async def stock_cargar_por_cedula(
         "chasis_detectado": campos.get("chasis"),
         "tipo_documento": tipo_doc["tipo"],
         "advertencias": advertencias,
+        "diagnostico": {
+            "frente_documento_detectado": frente_res.documento_detectado,
+            "frente_original_b64": frente_res.original_b64,
+            "frente_procesada_b64": frente_res.processed_b64,
+            "dorso_documento_detectado": dorso_res.documento_detectado,
+            "dorso_original_b64": dorso_res.original_b64,
+            "dorso_procesada_b64": dorso_res.processed_b64,
+        },
     }
 
 
