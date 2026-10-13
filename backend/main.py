@@ -68,12 +68,23 @@ def _get_ocr_engine():
         # baja a ~10-13s sin perder precisión en los campos que usamos
         # (dominio/marca/modelo/chasis/titular/domicilio/dni) -solo aparecen
         # más fragmentos sueltos de la marca de agua, que ya se filtran aparte.
+        #
+        # text_recognition_model_name="PP-OCRv5_mobile_rec" + cpu_threads=1:
+        # en el prototipo local (con RAM de sobra) el reconocedor "medium" era
+        # la opción válida. Desplegado en Render free tier (límite duro de
+        # 512MB), paddlepaddle + el reconocedor "medium" hacían OOM kill antes
+        # de terminar de cargar. Pasar a "mobile" en ambos modelos reduce la
+        # huella de memoria para que entre en el plan gratuito -el costo es
+        # algo de precisión, no medido todavía contra el real, pero es mejor
+        # que no tener nada corriendo.
         _ocr_engine = PaddleOCR(
             lang="es",
             use_doc_orientation_classify=False,
             use_doc_unwarping=False,
             use_textline_orientation=False,
             text_detection_model_name="PP-OCRv5_mobile_det",
+            text_recognition_model_name="PP-OCRv5_mobile_rec",
+            cpu_threads=1,
             enable_mkldnn=False,
         )
     return _ocr_engine
