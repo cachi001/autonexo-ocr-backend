@@ -16,10 +16,15 @@ RUN pip install --no-cache-dir -r requirements-deploy.txt
 COPY backend/ backend/
 COPY frontend/ frontend/
 
-# PaddleOCR descarga sus modelos (PP-OCRv5_mobile_det + PP-OCRv6_medium_rec)
-# la primera vez que se usan, no en el build -> el primer request después de
-# un deploy o reinicio tarda más (~20-30s) mientras los baja.
+# Los modelos de OCR se descargan la primera vez que se usan, no en el
+# build -> el primer request después de un deploy o reinicio tarda más
+# (~20-30s) mientras los baja.
 ENV PYTHONUNBUFFERED=1
+# Render free tiene 0.1 CPU: procesar una imagen de 1600px (el default local,
+# con CPU de sobra) tarda demasiado acá. 1000px sigue siendo legible para el
+# texto de la cédula (ver MIN_OCR_SHORT_SIDE en vision.py) pero reduce bastante
+# el tiempo de detección + OCR en una CPU débil.
+ENV CEDULA_MAX_DIM=1000
 
 EXPOSE 8000
 WORKDIR /app/backend

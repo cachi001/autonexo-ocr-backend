@@ -12,10 +12,16 @@ import difflib
 import re
 import unicodedata
 
+import os
+
 import cv2
 import numpy as np
 
-MAX_DIM = 1600
+# 1600 está validado en el prototipo local (CPU de sobra). En el deploy real
+# (Render free, 0.1 CPU) cada segundo de proceso cuenta -> se puede bajar sin
+# tocar el valor local vía la variable de entorno CEDULA_MAX_DIM (seteada
+# solo en el Dockerfile de deploy).
+MAX_DIM = int(os.environ.get("CEDULA_MAX_DIM", "1600"))
 
 
 def _to_b64_jpg(img: np.ndarray) -> str:
@@ -216,6 +222,21 @@ def detect_and_warp(img: np.ndarray) -> tuple[np.ndarray, bool]:
     c = _buscar_contorno_dominante(gray, img_area, img_bgr=img)
     if c is None:
         return img, False
+
+    # Bug encontrado con una captura de pantalla ya recortada al documento
+    # (sin fondo alrededor): los métodos de contorno encontraron un
+    # rectángulo INTERNO de la tarjeta (ej. el bloque de texto del domicilio)
+    # en vez del borde real de la cédula, y lo tomaban como válido porque por
+    # casualidad tenía una proporción parecida a 1.585 -> el resultado quedaba
+    # enfocado/recortado en una porción irrelevante, perdiendo campos como
+    # TITULAR. Si la imagen COMPLETA ya se parece a una cédula (proporción
+    # cercana a la real) más de lo que se parece el candidato recortado, es
+    # señal de que la imagen ya viene encuadrada al documento -> se usa
+    # entera en vez de recortar.
+    h_img, w_img = img.shape[:2]
+    distancia_imagen_completa = abs(max(w_img, h_img) / min(w_img, h_img) - _ASPECTO_CEDULA)
+    if distancia_imagen_completa <= _distancia_a_proporcion_cedula(c):
+        return img, True
 
     box = cv2.boxPoints(cv2.minAreaRect(c))
     doc_contour = box
