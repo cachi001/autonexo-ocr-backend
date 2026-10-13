@@ -125,21 +125,40 @@ def _contorno_por_grabcut(img_bgr: np.ndarray) -> np.ndarray | None:
     un método que sí use color y textura juntos, no solo uno de los dos.
     GrabCut hace exactamente eso: separa primer plano de fondo por color y
     textura, sembrado con un rectángulo que asume el documento ocupa la zona
-    central de la foto (un recorte del 8% en cada borde)."""
+    central de la foto (un recorte del 8% en cada borde).
+
+    El costo de GrabCut escala con la cantidad de píxeles, no con el
+    contenido -> los "5,9s" de la nota anterior se midieron en la máquina de
+    desarrollo (CPU de sobra); en el 0.1 CPU de Render esa misma cuenta tarda
+    muchísimo más (caso real medido: ~200s totales en una foto que dispara
+    este método). Por eso corre sobre una copia achicada a 400px de lado
+    mayor -el resultado de "dónde está el documento" no necesita resolución
+    completa- y al final se escalan las coordenadas del contorno de vuelta al
+    tamaño real para que el warp posterior siga siendo preciso."""
     h, w = img_bgr.shape[:2]
-    mask = np.zeros((h, w), np.uint8)
+    escala = min(1.0, 400 / max(h, w))
+    chica = (
+        cv2.resize(img_bgr, (max(1, int(w * escala)), max(1, int(h * escala))), interpolation=cv2.INTER_AREA)
+        if escala < 1
+        else img_bgr
+    )
+    hc, wc = chica.shape[:2]
+    mask = np.zeros((hc, wc), np.uint8)
     bgd_model = np.zeros((1, 65), np.float64)
     fgd_model = np.zeros((1, 65), np.float64)
-    rect = (int(w * 0.08), int(h * 0.08), int(w * 0.84), int(h * 0.84))
+    rect = (int(wc * 0.08), int(hc * 0.08), int(wc * 0.84), int(hc * 0.84))
     try:
-        # 2 iteraciones en vez del default (5): en la prueba real dio un
-        # resultado visualmente equivalente en 5,9s en vez de 11,3s.
-        cv2.grabCut(img_bgr, mask, rect, bgd_model, fgd_model, 2, cv2.GC_INIT_WITH_RECT)
+        cv2.grabCut(chica, mask, rect, bgd_model, fgd_model, 2, cv2.GC_INIT_WITH_RECT)
     except cv2.error:
         return None
     mask_fg = np.where((mask == 2) | (mask == 0), 0, 255).astype(np.uint8)
     contours, _ = cv2.findContours(mask_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return max(contours, key=cv2.contourArea) if contours else None
+    if not contours:
+        return None
+    mejor = max(contours, key=cv2.contourArea)
+    if escala < 1:
+        mejor = (mejor.astype(np.float32) / escala).astype(np.int32)
+    return mejor
 
 
 def _distancia_a_proporcion_cedula(c: np.ndarray) -> float:
