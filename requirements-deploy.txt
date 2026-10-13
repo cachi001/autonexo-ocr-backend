@@ -1,13 +1,14 @@
-# Dependencias para desplegar el backend real (OpenCV + PaddleOCR) en un
-# hosting que soporte procesos pesados (Railway/Render), a diferencia de
-# requirements.txt que incluye además easyocr/pytesseract usados SOLO por
-# benchmark_ocr.py para comparar motores -no los usa la app en producción-
-# y que inflarían mucho la imagen (easyocr arrastra torch).
+# Dependencias para desplegar el backend real (OpenCV + OCR) en Render.
+# Usa rapidocr-onnxruntime en vez de paddlepaddle/paddleocr: son los MISMOS
+# pesos de modelo PP-OCR pero corridos vía ONNX Runtime -el framework
+# completo de paddlepaddle hacía OOM kill en el límite de 512MB del plan
+# free de Render incluso con los modelos más chicos-. requirements.txt
+# (el que usa el prototipo local) se deja con paddleocr, que ahí sí corre
+# bien con la RAM de la máquina de desarrollo.
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 python-multipart>=0.0.9
 opencv-python-headless>=4.9.0.80
 numpy>=1.26.0
 pillow>=10.0.0
-paddlepaddle>=3.0.0
-paddleocr>=3.0.0
+rapidocr-onnxruntime>=1.3.0

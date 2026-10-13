@@ -49,55 +49,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_ocr_engine = None  # PaddleOCR es pesado de inicializar: se carga una sola vez, en el primer request
+_ocr_engine = None  # pesado de inicializar: se carga una sola vez, en el primer request
+
+# PaddleOCR "de verdad" (el framework completo de paddlepaddle) hace OOM kill
+# en el plan free de Render (límite duro de 512MB) incluso con los modelos
+# "mobile" más chicos -el framework en sí ya usa varios cientos de MB solo al
+# importarse-. RapidOCR corre los MISMOS pesos de modelo PP-OCR (no es un
+# motor distinto, es el mismo entrenado por PaddleOCR) pero vía ONNX Runtime
+# en vez del framework completo de Paddle -> mucho más liviano en memoria,
+# entra cómodo en 512MB. La calidad de lectura debería ser equivalente a la
+# medida en el benchmark original (PaddleOCR le ganó a EasyOCR/Tesseract),
+# porque son los mismos pesos; no se volvió a medir cabeza a cabeza con
+# RapidOCR específicamente.
 
 
 def _get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
-        from paddleocr import PaddleOCR
+        from rapidocr_onnxruntime import RapidOCR
 
-        # enable_mkldnn=False: con mkldnn (el backend CPU por defecto de Paddle)
-        # esta versión de paddlepaddle tira un error interno de oneDNN/PIR en
-        # este entorno; desactivarlo lo soluciona sin perder precisión.
-        #
-        # text_detection_model_name="PP-OCRv5_mobile_det": el detector "medium"
-        # (el que queda por default) tardaba 22-24s por imagen en CPU. Medimos
-        # que el cuello de botella es el DETECTOR, no el reconocedor: usando el
-        # detector "mobile" + el reconocedor "medium" (el default) el tiempo
-        # baja a ~10-13s sin perder precisión en los campos que usamos
-        # (dominio/marca/modelo/chasis/titular/domicilio/dni) -solo aparecen
-        # más fragmentos sueltos de la marca de agua, que ya se filtran aparte.
-        #
-        # text_recognition_model_name="PP-OCRv5_mobile_rec" + cpu_threads=1:
-        # en el prototipo local (con RAM de sobra) el reconocedor "medium" era
-        # la opción válida. Desplegado en Render free tier (límite duro de
-        # 512MB), paddlepaddle + el reconocedor "medium" hacían OOM kill antes
-        # de terminar de cargar. Pasar a "mobile" en ambos modelos reduce la
-        # huella de memoria para que entre en el plan gratuito -el costo es
-        # algo de precisión, no medido todavía contra el real, pero es mejor
-        # que no tener nada corriendo.
-        _ocr_engine = PaddleOCR(
-            lang="es",
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
-            text_detection_model_name="PP-OCRv5_mobile_det",
-            text_recognition_model_name="PP-OCRv5_mobile_rec",
-            cpu_threads=1,
-            enable_mkldnn=False,
-        )
+        _ocr_engine = RapidOCR()
     return _ocr_engine
 
 
 def _run_ocr(engine, img) -> list[str]:
     if img.ndim == 2:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    result = engine.predict(img)
-    textos: list[str] = []
-    for page in result:
-        textos.extend(page.get("rec_texts", []))
-    return [t for t in textos if t.strip()]
+    result, _ = engine(img)
+    if not result:
+        return []
+    return [texto for _box, texto, _score in result if texto.strip()]
 
 
 class CampoComparado(BaseModel):
