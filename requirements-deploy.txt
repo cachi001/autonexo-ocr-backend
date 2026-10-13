@@ -1,0 +1,13 @@
+# Dependencias para desplegar el backend real (OpenCV + PaddleOCR) en un
+# hosting que soporte procesos pesados (Railway/Render), a diferencia de
+# requirements.txt que incluye además easyocr/pytesseract usados SOLO por
+# benchmark_ocr.py para comparar motores -no los usa la app en producción-
+# y que inflarían mucho la imagen (easyocr arrastra torch).
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+python-multipart>=0.0.9
+opencv-python-headless>=4.9.0.80
+numpy>=1.26.0
+pillow>=10.0.0
+paddlepaddle>=3.0.0
+paddleocr>=3.0.0

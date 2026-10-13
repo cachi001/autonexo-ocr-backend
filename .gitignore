@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.log
+.data/
+models/
+test_images/
+stock_data.json
+leads_data.json
+informe_autoclick.html

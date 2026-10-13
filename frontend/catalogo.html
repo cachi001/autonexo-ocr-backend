@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Catálogo — Prototipo lado comprador</title>
+<style>
+  :root {
+    --bg: #ffffff; --surface: #fafafa; --border: #e4e4e7;
+    --text: #18181b; --muted: #71717a; --accent: #2563eb; --accent-contrast: #ffffff;
+    --ok: #15803d; --ok-bg: #f0fdf4; --ok-border: #bbf7d0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; }
+  header h1 { margin: 0 0 6px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 640px; }
+  header nav a { font-size: 13px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); padding: 7px 12px; border-radius: 7px; }
+  header nav a:hover { background: var(--surface); }
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 32px 100px; }
+  .buscador { display:flex; gap:10px; margin-bottom:22px; }
+  .buscador input { flex:1; padding: 11px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .card-vehiculo { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; cursor: pointer; transition: box-shadow .15s, transform .15s; }
+  .card-vehiculo:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); transform: translateY(-1px); }
+  .card-foto { position: relative; height: 130px; background: var(--surface); display:flex; align-items:center; justify-content:center; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); }
+  .badge-papeles {
+    position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 4px;
+    background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-border);
+    border-radius: 20px; padding: 3px 9px 3px 6px; font-size: 10.5px; font-weight: 700;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  }
+  .badge-papeles svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .card-body { padding: 12px 14px; }
+  .card-dominio { font-size: 11px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+  .card-titulo { font-size: 15px; font-weight: 600; margin: 2px 0 6px; }
+  .card-precio { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+  .card-meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 4px; }
+
+  .overlay { display:none; position: fixed; inset: 0; background: rgba(0,0,0,.45); align-items:center; justify-content:center; padding: 20px; z-index: 10; }
+  .overlay.open { display: flex; }
+  .modal { background:#fff; border-radius: 14px; max-width: 460px; width: 100%; padding: 24px; position: relative; max-height: 90vh; overflow-y: auto; }
+  .modal-cerrar { position: absolute; top: 14px; right: 14px; border: none; background: var(--surface); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--muted); }
+  .modal h2 { margin: 2px 0 4px; font-size: 18px; }
+  .modal .precio { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 14px; }
+  .modal .datos { font-size: 13px; color: var(--muted); display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-bottom: 18px; padding: 12px; background: var(--surface); border-radius: 8px; }
+  .modal label { display:block; font-size: 12px; font-weight: 600; margin: 10px 0 4px; }
+  .modal input, .modal textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; font-family: inherit; }
+  .modal textarea { min-height: 70px; resize: vertical; }
+  .btn-consultar { width: 100%; margin-top: 14px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; padding: 11px; cursor: pointer; }
+  .btn-consultar:hover { opacity: .9; }
+  .btn-consultar:disabled { opacity: .5; cursor: default; }
+  .confirmacion { background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok); border-radius: 8px; padding: 12px 14px; font-size: 13px; margin-top: 14px; line-height: 1.5; }
+  .vacio { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Catálogo de vehículos — Prototipo (lado comprador)</h1>
+    <p>Así vería un comprador el stock cargado por las agencias. Al abrir una ficha se registra una vista real; al consultar, se crea un interés que la agencia ve en su panel y responde a mano — nada se confirma automáticamente.</p>
+  </div>
+  <nav><a href="/stock">Panel de agencia →</a></nav>
+</header>
+
+<main>
+  <div class="buscador">
+    <input type="text" id="buscar" placeholder="Buscá por marca, modelo o dominio…" />
+  </div>
+  <div id="grid" class="cards-grid"></div>
+  <p id="vacio" class="vacio" style="display:none">Todavía no hay vehículos cargados.</p>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <button class="modal-cerrar" id="cerrarModal">✕</button>
+    <div id="modalContenido"></div>
+  </div>
+</div>
+
+<script>
+const iconoCedula = `<svg viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0.5" y="0.5" width="23" height="15" rx="2" stroke="currentColor"/>
+  <circle cx="6" cy="8" r="2.4" stroke="currentColor"/>
+  <line x1="11" y1="5.5" x2="20" y2="5.5" stroke="currentColor"/>
+  <line x1="11" y1="8" x2="20" y2="8" stroke="currentColor"/>
+  <line x1="11" y1="10.5" x2="17" y2="10.5" stroke="currentColor"/>
+</svg>`;
+
+let vehiculos = [];
+
+function formatoPrecio(p) {
+  const n = parseFloat(p);
+  if (isNaN(n)) return p;
+  return '$' + n.toLocaleString('es-AR');
+}
+
+async function cargar() {
+  const res = await fetch('/catalogo/stock');
+  const data = await res.json();
+  vehiculos = data.vehiculos || [];
+  render(vehiculos);
+}
+
+function render(lista) {
+  const grid = document.getElementById('grid');
+  document.getElementById('vacio').style.display = lista.length ? 'none' : 'block';
+  grid.innerHTML = lista.map(v => `
+    <div class="card-vehiculo" data-dominio="${v.dominio}">
+      <div class="card-foto">
+        📷 (próximamente)
+        ${v.documentacion_validada ? `<span class="badge-papeles">${iconoCedula} Papeles OK</span>` : ''}
+      </div>
+      <div class="card-body">
+        <div class="card-dominio">${v.dominio}</div>
+        <div class="card-titulo">${v.marca} ${v.modelo}</div>
+        <div class="card-precio">${formatoPrecio(v.precio)}</div>
+        <div class="card-meta"><span>${v.anio}</span><span>${v.km ? v.km + ' km' : '—'}</span><span>${v.color || '—'}</span></div>
+      </div>
+    </div>`).join('');
+
+  grid.querySelectorAll('.card-vehiculo').forEach(card => {
+    card.addEventListener('click', () => abrirFicha(card.dataset.dominio));
+  });
+}
+
+document.getElementById('buscar').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  render(vehiculos.filter(v =>
+    !q || [v.marca, v.modelo, v.dominio].some(c => (c || '').toLowerCase().includes(q))
+  ));
+});
+
+async function abrirFicha(dominio) {
+  const v = vehiculos.find(x => x.dominio === dominio);
+  if (!v) return;
+
+  // registrar vista real — se cuenta cada vez que se abre la ficha, como haría
+  // cualquier contador de visitas de una página de detalle
+  fetch(`/catalogo/${encodeURIComponent(dominio)}/vista`, { method: 'POST' }).catch(() => {});
+
+  document.getElementById('modalContenido').innerHTML = `
+    <h2>${v.marca} ${v.modelo}</h2>
+    <div class="precio">${formatoPrecio(v.precio)}</div>
+    <div class="datos">
+      <span>Año: ${v.anio}</span>
+      <span>Km: ${v.km || '—'}</span>
+      <span>Color: ${v.color || '—'}</span>
+      <span>Dominio: ${v.dominio}</span>
+    </div>
+    ${v.descripcion ? `<p style="font-size:13px;color:#52525b">${v.descripcion}</p>` : ''}
+    <div id="bloqueConsulta">
+      <label for="nombreInput">Tu nombre</label>
+      <input type="text" id="nombreInput" placeholder="¿Cómo te llamás?" />
+      <label for="telInput">Teléfono (opcional)</label>
+      <input type="text" id="telInput" placeholder="Para que la agencia te contacte" />
+      <label for="mensajeInput">Tu consulta</label>
+      <textarea id="mensajeInput" placeholder="Ej: ¿Está disponible? ¿Acepta permuta?"></textarea>
+      <button class="btn-consultar" id="btnEnviarConsulta">Enviar consulta a la agencia</button>
+    </div>
+  `;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('btnEnviarConsulta').addEventListener('click', () => enviarConsulta(dominio));
+}
+
+async function enviarConsulta(dominio) {
+  const nombre = document.getElementById('nombreInput').value.trim();
+  const telefono = document.getElementById('telInput').value.trim();
+  const mensaje = document.getElementById('mensajeInput').value.trim();
+  if (!nombre || !mensaje) {
+    alert('Completá tu nombre y la consulta.');
+    return;
+  }
+  const btn = document.getElementById('btnEnviarConsulta');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  try {
+    const res = await fetch(`/catalogo/${encodeURIComponent(dominio)}/consulta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, telefono, mensaje }),
+    });
+    const data = await res.json();
+    if (data.error) { alert('Error: ' + data.error); btn.disabled = false; return; }
+    document.getElementById('bloqueConsulta').innerHTML = `
+      <div class="confirmacion">
+        ✓ Tu consulta fue enviada a la agencia. Todavía no está confirmada ni respondida —
+        un vendedor la va a revisar y te va a contactar directamente. Autoclick no vende
+        el auto ni confirma nada en tu nombre.
+      </div>`;
+  } catch (err) {
+    alert('Error al enviar: ' + err.message);
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('cerrarModal').addEventListener('click', () => {
+  document.getElementById('overlay').classList.remove('open');
+});
+document.getElementById('overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'overlay') document.getElementById('overlay').classList.remove('open');
+});
+
+cargar();
+</script>
+</body>
+</html>
