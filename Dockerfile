@@ -25,6 +25,11 @@ ENV PYTHONUNBUFFERED=1
 # texto de la cédula (ver MIN_OCR_SHORT_SIDE en vision.py) pero reduce bastante
 # el tiempo de detección + OCR en una CPU débil.
 ENV CEDULA_MAX_DIM=1000
+# El cuello de botella real medido en producción no es la detección sino el
+# OCR en sí (ver vision.py): bajar esto de 700 a 550 solo en Render reduce
+# los píxeles que entran al reconocimiento de texto, validado localmente sin
+# pérdida de calidad en los campos clave (marca, modelo, chasis, titular).
+ENV MIN_OCR_SHORT_SIDE=550
 
 EXPOSE 8000
 WORKDIR /app/backend

@@ -283,7 +283,12 @@ def detect_and_warp(img: np.ndarray) -> tuple[np.ndarray, bool]:
     return warped, True
 
 
-MIN_OCR_SHORT_SIDE = 700  # por debajo de esto, EasyOCR lee mal el texto chico de la cédula
+# Por debajo de esto, EasyOCR lee mal el texto chico de la cédula (validado
+# en 700 con CPU de sobra). En Render (0.1 CPU) esto domina el tiempo total:
+# logs reales mostraron ~60-72s solo en reconocimiento por imagen con 700px
+# de lado corto -> bajable solo en el deploy vía MIN_OCR_SHORT_SIDE, sin
+# tocar el valor local ya validado.
+MIN_OCR_SHORT_SIDE = int(os.environ.get("MIN_OCR_SHORT_SIDE", "700"))
 
 
 def _upscale_if_small(img: np.ndarray) -> np.ndarray:
