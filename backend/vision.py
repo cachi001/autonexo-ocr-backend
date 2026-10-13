@@ -400,6 +400,15 @@ def _norm(s: str) -> str:
 _LABEL_RATIO_MIN = 0.65  # el OCR en documentos con fondo de seguridad suele corromper letras
 
 
+def _solo_alfanumerico(s: str) -> str:
+    """Saca espacios/puntuación para comparar etiquetas por sus letras, no por
+    cómo las separó el OCR. Bug real: "DOC.D.N.I.:" (como lo lee el OCR, con
+    un punto entre cada letra) comparado contra la etiqueta "doc d n i" (con
+    espacios) daba 0.63 de similitud -> por debajo de _LABEL_RATIO_MIN (0.65)
+    aunque las letras son exactamente las mismas, solo cambia el separador."""
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
 def _best_label_match(norm_line: str, usados: set[str]) -> tuple[str, str, float] | None:
     """Encuentra la (campo, etiqueta) más parecida al PRINCIPIO de la línea,
     tolerando que el OCR haya corrompido algunas letras de la etiqueta.
@@ -417,7 +426,7 @@ def _best_label_match(norm_line: str, usados: set[str]) -> tuple[str, str, float
             if len(label) < 4:
                 continue  # labels muy cortos (ej. "dni") generan falsos positivos por azar
             prefix = norm_line[: len(label) + 1]
-            ratio = difflib.SequenceMatcher(None, prefix, label).ratio()
+            ratio = difflib.SequenceMatcher(None, _solo_alfanumerico(prefix), _solo_alfanumerico(label)).ratio()
             if best is None or ratio > best[2]:
                 best = (campo, label, ratio)
     return best
