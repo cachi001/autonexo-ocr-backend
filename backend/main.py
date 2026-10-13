@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import difflib
 import unicodedata
+import time
 from pathlib import Path
 
 import cv2
@@ -75,7 +76,11 @@ def _get_ocr_engine():
 def _run_ocr(engine, img) -> list[str]:
     if img.ndim == 2:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    result, _ = engine(img)
+    t0 = time.time()
+    result, elapse = engine(img)
+    # Instrumentación temporal para medir dónde se va el tiempo en Render
+    # (0.1 CPU) -- quitar una vez identificado el cuello de botella real.
+    print(f"[timing] engine() total={time.time() - t0:.2f}s det/cls/rec={elapse} shape={img.shape}", flush=True)
     if not result:
         return []
     return [texto for _box, texto, _score in result if texto.strip()]
@@ -147,7 +152,9 @@ def _coincide(declarado: str | None, extraido: str | None, umbral: float = 0.75)
 
 
 def _procesar_lado(image_bytes: bytes, engine) -> _LadoResultado:
+    t0 = time.time()
     resultado = vision.run_pipeline(image_bytes)
+    print(f"[timing] run_pipeline (deteccion+warp) total={time.time() - t0:.2f}s", flush=True)
     texto_ocr = _run_ocr(engine, resultado["enhanced_gray"])
     texto_crudo = vision.filtrar_ruido(texto_ocr)
     campos = vision.map_fields(texto_crudo)
