@@ -309,10 +309,18 @@ async def stock_cargar_por_cedula(
     if not campos.get("dominio"):
         advertencias.append("No se pudo leer el dominio — completalo a mano antes de guardar.")
 
+    if dorso_res.presente and not dorso_res.campos_extraidos.get("titular"):
+        advertencias.append("Se subió el dorso pero no se pudo leer el nombre del titular — completalo a mano si hace falta.")
+
     return {
         "fila": fila_validada.model_dump(),
         "chasis_detectado": campos.get("chasis"),
         "tipo_documento": tipo_doc["tipo"],
+        "titular": {
+            "nombre": dorso_res.campos_extraidos.get("titular"),
+            "domicilio": dorso_res.campos_extraidos.get("domicilio"),
+            "dni": dorso_res.campos_extraidos.get("doc_dni"),
+        } if dorso_res.presente else None,
         "advertencias": advertencias,
         "diagnostico": {
             "frente_documento_detectado": frente_res.documento_detectado,
