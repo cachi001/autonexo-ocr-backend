@@ -24,8 +24,9 @@ mapeo) y `backend/main.py` (API + comparación + sello).
 
 ## Cómo correrlo
 
-Requiere Python 3.12 (EasyOCR/Torch todavía no tienen wheels para 3.14,
-por eso el venv se creó con `py -3.12`).
+Requiere Python 3.12 (EasyOCR/Torch, que `requirements.txt` instala solo para
+`benchmark_ocr.py` — no para la app, que usa PaddleOCR —, todavía no tienen
+wheels para 3.14, por eso el venv se creó con `py -3.12`).
 
 ```bash
 cd prototipo-cedula-ocr
@@ -35,7 +36,7 @@ py -3.12 -m venv .venv
 ```
 
 Abrir `http://127.0.0.1:8731/`. La primera vez que se procesa una imagen,
-EasyOCR descarga sus modelos (~130 MB) — tarda más esa primera vez.
+PaddleOCR descarga sus modelos — tarda más esa primera vez.
 
 ## Imagen de prueba sintética
 
