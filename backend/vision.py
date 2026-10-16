@@ -370,12 +370,16 @@ _LABELS = {
     "doc_dni": ["doc d n i", "documento"],
 }
 
-_PATENTE_RE = re.compile(r"\b([A-Z]{2}\s?\d{3}\s?[A-Z]{2}|[A-Z]{3}\s?\d{3})\b")
+# Vieja (ABC123), Mercosur auto (AB123CD), Mercosur moto (A123BCD) — mismos
+# tres formatos que stock.py (ahí se encontró el bug: probar con una cédula
+# real de moto, sesión 2026-10-11, mostró que faltaba el formato Mercosur
+# moto acá en vision.py, aunque ya estaba arreglado en stock.py).
+_PATENTE_RE = re.compile(r"\b([A-Z]{2}\s?\d{3}\s?[A-Z]{2}|[A-Z]{3}\s?\d{3}|[A-Z]\s?\d{3}\s?[A-Z]{3})\b")
 # Patente PARCIAL: acepta que falten letras/dígitos al final. Hace falta
 # porque en una foto real la patente puede quedar tapada a la mitad (otro
 # papel encima, un dedo, un reflejo) -> con el patrón completo esa parte
 # visible se perdía entera en vez de mostrarse como dato parcial.
-_PATENTE_PARCIAL_RE = re.compile(r"\b([A-Z]{2}\d{1,3}|[A-Z]{3}\d{1,3})\b")
+_PATENTE_PARCIAL_RE = re.compile(r"\b([A-Z]{2}\d{1,3}|[A-Z]{3}\d{1,3}|[A-Z]\d{1,3})\b")
 
 
 def _candidato_patente(texto: str) -> str | None:

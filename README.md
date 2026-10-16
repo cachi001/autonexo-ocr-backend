@@ -13,7 +13,7 @@ que los datos coinciden con lo publicado, y muestra un sello de
 2. **OpenCV** mejora la imagen para el OCR: normaliza la iluminación dividiendo
    por un blur grande (esto es lo que saca reflejos/sombras del plástico de la
    cédula), sube contraste con CLAHE, reduce ruido y enfoca (unsharp mask).
-3. **EasyOCR** lee el texto de la imagen ya corregida.
+3. **PaddleOCR** (PP-OCRv6) lee el texto de la imagen ya corregida — local corre `paddleocr`, en Render corre `rapidocr-onnxruntime` (mismos pesos, vía ONNX, por el límite de 512MB del plan free). Se eligió sobre EasyOCR/Tesseract tras un benchmark real con foto de cédula de moto (`benchmark_ocr.py`) — EasyOCR confundía sistemáticamente 0/O, 1/I, 2/Z.
 4. Un parser por etiquetas conocidas (`DOMINIO`, `MARCA`, `MODELO`, etc.)
    mapea el texto crudo a campos estructurados.
 5. El backend compara esos campos contra los datos que la agencia ya cargó
