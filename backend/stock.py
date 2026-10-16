@@ -22,8 +22,24 @@ from pydantic import BaseModel
 
 STOCK_FILE = Path(__file__).parent.parent / "stock_data.json"
 
-COLUMNAS = ["dominio", "marca", "modelo", "anio", "tipo", "precio", "km", "color", "descripcion"]
-COLUMNAS_OBLIGATORIAS = {"dominio", "marca", "modelo", "anio", "precio"}
+COLUMNAS = ["dominio", "categoria", "marca", "modelo", "anio", "tipo", "precio", "km", "color", "descripcion"]
+COLUMNAS_OBLIGATORIAS = {"dominio", "categoria", "marca", "modelo", "anio", "precio"}
+
+# "categoria" (Auto/Moto/Camion/Utilitario) es un campo distinto de "tipo"
+# (carrocería libre: SEDAN, PICKUP, HATCHBACK...) — antes no existía y "tipo"
+# quedaba como el único campo de clasificación, en texto libre sin validar.
+# Se necesita en la carga masiva (acá) porque de "categoria" depende qué
+# campos técnicos propios (cilindrada, ejes, etc.) se piden después, en la
+# ficha individual del vehículo (decisión 2026-10-16, ver sección de estado
+# "borrador" más abajo) — esos campos NO van en el CSV de carga masiva.
+CATEGORIAS = {"AUTO", "MOTO", "CAMION", "UTILITARIO"}
+
+# Toda fila que entra por carga masiva nace en estado "borrador": tiene los
+# datos básicos para existir en el stock, pero todavía le faltan los campos
+# técnicos propios de su categoría (se completan después, uno por uno, en la
+# ficha individual) y la validación por cédula. Pasa a "completo" cuando la
+# agencia termina de cargar esos campos en la ficha del vehículo.
+ESTADOS_VEHICULO = {"BORRADOR", "COMPLETO"}
 
 # Vieja (ABC123), Mercosur auto (AB123CD), Mercosur moto (A123BCD) —
 # probar con una cédula real de moto (sesión 2026-10-11) mostró que faltaba
@@ -32,6 +48,7 @@ _PATENTE_RE = re.compile(r"^[A-Z]{2}\d{3}[A-Z]{2}$|^[A-Z]{3}\d{3}$|^[A-Z]\d{3}[A
 
 FILA_EJEMPLO = {
     "dominio": "AB123CD",
+    "categoria": "AUTO",
     "marca": "VOLKSWAGEN",
     "modelo": "GOL TREND",
     "anio": "2019",
@@ -77,6 +94,11 @@ def _validar_fila(fila: dict, numero: int) -> FilaValidada:
     datos["dominio"] = dominio
     if dominio and not _PATENTE_RE.match(dominio):
         errores.append(f"dominio '{dominio}' no tiene formato de patente válido (ej. AB123CD o ABC123)")
+
+    categoria = datos["categoria"].upper()
+    datos["categoria"] = categoria
+    if categoria and categoria not in CATEGORIAS:
+        errores.append(f"categoria '{categoria}' inválida (debe ser: {', '.join(sorted(CATEGORIAS))})")
 
     if datos["anio"]:
         try:
@@ -140,6 +162,8 @@ def cargar_stock_con_metricas() -> list[dict]:
         v.setdefault("documentacion_validada", False)
         v.setdefault("documentacion_validada_fecha", None)
         v.setdefault("vistas_reales", 0)
+        v.setdefault("categoria", "AUTO")  # stock cargado antes de que existiera el campo
+        v.setdefault("estado", "COMPLETO")  # idem — no reabrir como borrador retroactivamente
         v["consultas_reales"] = conteo_real.get(v["dominio"], 0)
     return stock
 
@@ -156,6 +180,7 @@ def guardar_filas_validas(filas: list[FilaValidada]) -> list[dict]:
         fila = dict(f.datos)
         fila["documentacion_validada"] = False
         fila["documentacion_validada_fecha"] = None
+        fila["estado"] = "BORRADOR"  # falta completar los campos propios de su categoría (ver CATEGORIAS)
         stock.append(fila)
         existentes.add(fila["dominio"])
         agregados.append(fila)
