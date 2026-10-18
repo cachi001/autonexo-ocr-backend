@@ -53,7 +53,11 @@ async def consultar(dominio: str) -> dict:
 
         bloque = await page.query_selector('script[type="application/ld+json"]')
         if bloque is None:
-            return {"ok": False, "error": "patente.ar no devolvió datos estructurados para ese dominio."}
+            titulo = await page.title()
+            return {
+                "ok": False,
+                "error": f"patente.ar no devolvió datos estructurados para ese dominio (título de la página: '{titulo}').",
+            }
         contenido = await bloque.inner_text()
         datos = json.loads(contenido)
 
