@@ -13,6 +13,13 @@ WORKDIR /app
 COPY requirements-deploy.txt .
 RUN pip install --no-cache-dir -r requirements-deploy.txt
 
+# Chromium para el flujo de validación DNRPA (dnrpa_informe.py) -no se
+# levanta en el arranque del proceso, solo cuando una agencia pide validar
+# un dominio, así no queda residente en memoria compitiendo con el OCR
+# todo el tiempo-. --with-deps instala las librerías del sistema que
+# Chromium necesita (nss, atk, cups, fuentes, etc.).
+RUN playwright install --with-deps chromium
+
 COPY backend/ backend/
 COPY frontend/ frontend/
 

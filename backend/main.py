@@ -37,6 +37,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import dnrpa_informe
 import leads
 import stock
 import vision
@@ -386,6 +387,42 @@ async def stock_set_documentacion(dominio: str, payload: ValidarDocumentacionPay
     if vehiculo is None:
         return {"error": f"No se encontró el dominio '{dominio}' en el stock"}
     return vehiculo
+
+
+# ---------------------------------------------------------------------------
+# Validación de marca/modelo/año reales contra la DNRPA ("Obtener Informe
+# Web"), gratis -ver dnrpa_informe.py para el porqué de todo el diseño-.
+# ---------------------------------------------------------------------------
+
+class DnrpaAltaSolicitante(BaseModel):
+    apellido: str
+    nombre: str
+    email: str
+    celular_codigo_area: str
+    celular_numero: str
+    celular_operador: str
+
+
+class DnrpaIniciarPayload(BaseModel):
+    cuit: str
+    dominio: str
+    alta: DnrpaAltaSolicitante | None = None
+
+
+@app.post("/dnrpa/informe/iniciar")
+async def dnrpa_informe_iniciar(payload: DnrpaIniciarPayload):
+    alta = payload.alta.model_dump() if payload.alta else None
+    return await dnrpa_informe.iniciar(payload.cuit.strip(), payload.dominio.strip(), alta)
+
+
+class DnrpaCaptchaPayload(BaseModel):
+    session_id: str
+    indices: list[int]
+
+
+@app.post("/dnrpa/informe/captcha")
+async def dnrpa_informe_captcha(payload: DnrpaCaptchaPayload):
+    return await dnrpa_informe.resolver_captcha(payload.session_id, payload.indices)
 
 
 # ---------------------------------------------------------------------------

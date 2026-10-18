@@ -6,6 +6,7 @@ numpy>=1.26.0
 pillow>=10.0.0
 paddlepaddle>=3.0.0
 paddleocr>=3.0.0
+playwright>=1.47.0
 
 # usados solo por benchmark_ocr.py, para comparar motores (no los usa la app):
 easyocr>=1.7.1
