@@ -38,6 +38,7 @@ import time
 import uuid
 
 from playwright.async_api import async_playwright, Browser, Page, Playwright
+from playwright_stealth import Stealth
 
 SITE_URL = "https://www2.jus.gov.ar/dnrpa-site/#!/solicitante"
 SESSION_TIMEOUT_SECONDS = 300  # una IP de Render nueva/poco usada hace que reCAPTCHA pida más rondas de lo normal (riesgo visto en vivo: 9+ rondas) -3 min quedaba corto
@@ -176,27 +177,29 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(
             headless=True,
-            args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu"],
+            # --disable-blink-features=AutomationControlled apaga la señal de
+            # más bajo nivel que Chrome expone cuando lo maneja CDP (lo que
+            # usa Playwright) -el parche de navigator.webdriver solo no
+            # alcanzó (probado en vivo: 14+ rondas de captcha seguidas sin
+            # cerrar nunca, con categorías rotando, típico de un score de
+            # riesgo que nunca baja del umbral).
+            args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu", "--disable-blink-features=AutomationControlled"],
         )
-        # Probado en vivo (2026-10-18): el Chromium headless de Playwright se
-        # anuncia solo como bot -navigator.webdriver=true y "HeadlessChrome"
-        # en el user-agent-, y reCAPTCHA responde dándole rondas de captcha
-        # sin fin sin importar si las respuestas son correctas (el empleado
-        # de la agencia las resolvía bien y igual seguía pidiendo más). Esto
-        # NO reemplaza al humano resolviendo el captcha -eso sigue pasando
-        # en cada ronda-, solo deja de delatar un detalle técnico incidental
-        # del navegador que no tiene nada que ver con si hay una persona real
-        # del otro lado.
+        # El humano (empleado de la agencia) sigue resolviendo el captcha de
+        # verdad en cada ronda -esto no lo reemplaza, solo deja de delatar
+        # que el navegador está controlado por automatización (CDP), algo
+        # que no tiene nada que ver con si hay una persona real del otro
+        # lado resolviendo la imagen.
         contexto = await browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                 "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             ),
             viewport={"width": 1280, "height": 900},
+            locale="es-AR",
         )
-        await contexto.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
-        )
+        stealth = Stealth(navigator_user_agent=False)  # el UA ya lo seteamos arriba, no pisarlo
+        await stealth.apply_stealth_async(contexto)
         page = await contexto.new_page()
         page.set_default_timeout(45000)
         await page.goto(SITE_URL, wait_until="domcontentloaded")
