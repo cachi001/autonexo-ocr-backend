@@ -40,7 +40,7 @@ import uuid
 from playwright.async_api import async_playwright, Browser, Page, Playwright
 
 SITE_URL = "https://www2.jus.gov.ar/dnrpa-site/#!/solicitante"
-SESSION_TIMEOUT_SECONDS = 180  # si nadie resuelve el captcha en 3 min, se cierra solo
+SESSION_TIMEOUT_SECONDS = 300  # una IP de Render nueva/poco usada hace que reCAPTCHA pida más rondas de lo normal (riesgo visto en vivo: 9+ rondas) -3 min quedaba corto
 
 _lock = asyncio.Lock()
 _sesiones: dict[str, "_Sesion"] = {}
