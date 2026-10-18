@@ -38,6 +38,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import dnrpa_informe
+import patente_ar
 import leads
 import stock
 import vision
@@ -434,6 +435,20 @@ class DnrpaVerificarPayload(BaseModel):
 @app.post("/dnrpa/informe/captcha/verificar")
 async def dnrpa_informe_verificar(payload: DnrpaVerificarPayload):
     return await dnrpa_informe.verificar(payload.session_id)
+
+
+# ---------------------------------------------------------------------------
+# Marca/modelo/año vía patente.ar -alternativa automática y sin captcha al
+# flujo de dnrpa_informe.py (ver patente_ar.py para el porqué).
+# ---------------------------------------------------------------------------
+
+class PatenteArPayload(BaseModel):
+    dominio: str
+
+
+@app.post("/patente-ar/consultar")
+async def patente_ar_consultar(payload: PatenteArPayload):
+    return await patente_ar.consultar(payload.dominio)
 
 
 # ---------------------------------------------------------------------------
