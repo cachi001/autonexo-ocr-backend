@@ -254,7 +254,8 @@ async def resolver_captcha(session_id: str, indices: list[int]) -> dict:
     if sesion is None:
         return {"error": "Esa consulta ya expiró o no existe. Empezá de nuevo."}
     if await _limpiar_si_vencida(sesion):
-        return {"error": "Pasaron más de 3 minutos sin resolver el captcha. Empezá de nuevo."}
+        minutos = SESSION_TIMEOUT_SECONDS // 60
+        return {"error": f"Pasaron más de {minutos} minutos sin resolver el captcha. Empezá de nuevo."}
 
     page = sesion.page
     frame = _bframe(page)
