@@ -180,16 +180,17 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
     browser = None
     try:
         playwright = await async_playwright().start()
-        # headless=False (headful real, contra el display virtual Xvfb que
-        # arranca xvfb-run en el Dockerfile): el modo headless, aunque se le
-        # parchee user-agent/navigator.webdriver/CDP (ver stealth abajo),
-        # sigue renderizando distinto por dentro -probado en vivo: con todo
-        # eso aplicado, la cantidad de rondas de captcha no bajó nada. Un
-        # Chromium headful de verdad renderiza igual que el de cualquier
-        # usuario, sin esa diferencia de fondo.
+        # headless=True: se probó headful real (Xvfb) para que reCAPTCHA no
+        # pueda distinguirlo de un navegador de escritorio normal, pero en el
+        # 0.1 CPU compartido del plan free de Render ni siquiera llegaba a
+        # procesar un clic en menos de 90s -no es viable ahí, aunque en teoría
+        # sea mejor contra la detección. Con headless + stealth (de abajo) al
+        # menos se llega de forma confiable hasta el captcha real cada vez;
+        # la cantidad de rondas que pide Google queda afuera de lo que el
+        # código puede controlar.
         browser = await playwright.chromium.launch(
-            headless=False,
-            args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-blink-features=AutomationControlled"],
+            headless=True,
+            args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu", "--disable-blink-features=AutomationControlled"],
         )
         # El humano (empleado de la agencia) sigue resolviendo el captcha de
         # verdad en cada ronda -esto no lo reemplaza, solo deja de delatar
@@ -261,22 +262,10 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
         desafio = await _leer_desafio(frame)
         if desafio is None:
             resultado = await _resultado_o_error(page)
-            if resultado and resultado.get("ok"):
-                await sesion.cerrar()
-                return {"session_id": None, "resultado": resultado}
-            # Diagnóstico temporal: ni desafío ni resultado -mandar una
-            # captura de lo que hay en pantalla en vez de seguir adivinando
-            # a ciegas con más timeouts.
-            debug_b64 = None
-            try:
-                debug_b64 = base64.b64encode(await page.screenshot(type="png", full_page=True)).decode("ascii")
-            except Exception:
-                pass
             await sesion.cerrar()
-            return {
-                "error": (resultado or {}).get("error", "No se pudo leer el captcha. Probá de nuevo."),
-                "debug_imagen_b64": debug_b64,
-            }
+            if resultado and resultado.get("ok"):
+                return {"session_id": None, "resultado": resultado}
+            return {"error": (resultado or {}).get("error", "No se pudo leer el captcha. Probá de nuevo.")}
 
         return {"session_id": session_id, "desafio": desafio}
     except Exception as e:
