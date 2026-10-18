@@ -44,6 +44,7 @@ SESSION_TIMEOUT_SECONDS = 300  # una IP de Render nueva/poco usada hace que reCA
 
 _lock = asyncio.Lock()
 _sesiones: dict[str, "_Sesion"] = {}
+_lock_tomado_en: float | None = None  # para poder autoliberar un lock que quedó pegado
 
 
 class _Sesion:
@@ -55,6 +56,7 @@ class _Sesion:
         self.created_at = time.time()
 
     async def cerrar(self):
+        global _lock_tomado_en
         try:
             await self.browser.close()
         except Exception:
@@ -66,6 +68,7 @@ class _Sesion:
         _sesiones.pop(self.id, None)
         if _lock.locked():
             _lock.release()
+            _lock_tomado_en = None
 
 
 async def _limpiar_si_vencida(sesion: "_Sesion") -> bool:
@@ -150,9 +153,23 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
     si ese CUIT TODAVÍA no está registrado como solicitante en la DNRPA -se
     completa una sola vez por agencia, igual que se hizo a mano para la
     agencia de ejemplo."""
+    global _lock_tomado_en
     if _lock.locked():
-        return {"error": "Ya hay otra consulta DNRPA en curso. Esperá a que termine y probá de nuevo."}
+        # Si el lock lleva más tiempo tomado que el límite de sesión, algo
+        # quedó pegado a mitad de camino (un request que nunca llegó a
+        # crear la sesión, o una pestaña que se cerró sin volver a llamar
+        # al endpoint de captcha) -se libera solo en vez de bloquear para
+        # siempre a la agencia.
+        if _lock_tomado_en is not None and time.time() - _lock_tomado_en > SESSION_TIMEOUT_SECONDS:
+            for sesion_vieja in list(_sesiones.values()):
+                await sesion_vieja.cerrar()
+            if _lock.locked():
+                _lock.release()
+            _lock_tomado_en = None
+        else:
+            return {"error": "Ya hay otra consulta DNRPA en curso. Esperá a que termine y probá de nuevo."}
     await _lock.acquire()
+    _lock_tomado_en = time.time()
     playwright = None
     browser = None
     try:
@@ -200,6 +217,7 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
                 await browser.close()
                 await playwright.stop()
                 _lock.release()
+                _lock_tomado_en = None
                 return {
                     "error": (
                         f"El CUIT {cuit} todavía no está registrado como solicitante en la DNRPA "
@@ -255,6 +273,7 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
             except Exception:
                 pass
         _lock.release()
+        _lock_tomado_en = None
         return {"error": f"No se pudo iniciar la consulta a la DNRPA: {e}"}
 
 
