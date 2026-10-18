@@ -91,7 +91,10 @@ async def _leer_desafio(frame) -> dict | None:
     captura de la grilla de 9 imágenes. Si no hay desafío (ya se resolvió,
     o reCAPTCHA no lo pidió), devuelve None."""
     try:
-        prompt_el = await frame.wait_for_selector("div.rc-imageselect-desc-no-canonical, div.rc-imageselect-desc", timeout=4000)
+        # En headful/Xvfb el panel tarda más en pintar que en headless -4s se
+        # quedaba corto y tiraba "no se pudo leer el captcha" con el desafío
+        # todavía cargando (probado en vivo).
+        prompt_el = await frame.wait_for_selector("div.rc-imageselect-desc-no-canonical, div.rc-imageselect-desc", timeout=12000)
     except Exception:
         return None
     prompt = (await prompt_el.inner_text()).replace("\n", " ").strip()
@@ -281,7 +284,7 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
         return {"error": f"No se pudo iniciar la consulta a la DNRPA: {e}"}
 
 
-async def _esperar_bframe(page: Page, timeout_s: float = 8.0):
+async def _esperar_bframe(page: Page, timeout_s: float = 15.0):
     t0 = time.time()
     while time.time() - t0 < timeout_s:
         frame = _bframe(page)
