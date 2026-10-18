@@ -261,10 +261,22 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
         desafio = await _leer_desafio(frame)
         if desafio is None:
             resultado = await _resultado_o_error(page)
-            await sesion.cerrar()
             if resultado and resultado.get("ok"):
+                await sesion.cerrar()
                 return {"session_id": None, "resultado": resultado}
-            return {"error": (resultado or {}).get("error", "No se pudo leer el captcha. Probá de nuevo.")}
+            # Diagnóstico temporal: ni desafío ni resultado -mandar una
+            # captura de lo que hay en pantalla en vez de seguir adivinando
+            # a ciegas con más timeouts.
+            debug_b64 = None
+            try:
+                debug_b64 = base64.b64encode(await page.screenshot(type="png", full_page=True)).decode("ascii")
+            except Exception:
+                pass
+            await sesion.cerrar()
+            return {
+                "error": (resultado or {}).get("error", "No se pudo leer el captcha. Probá de nuevo."),
+                "debug_imagen_b64": debug_b64,
+            }
 
         return {"session_id": session_id, "desafio": desafio}
     except Exception as e:
