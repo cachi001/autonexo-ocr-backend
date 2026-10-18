@@ -415,14 +415,25 @@ async def dnrpa_informe_iniciar(payload: DnrpaIniciarPayload):
     return await dnrpa_informe.iniciar(payload.cuit.strip(), payload.dominio.strip(), alta)
 
 
-class DnrpaCaptchaPayload(BaseModel):
+class DnrpaMarcarPayload(BaseModel):
     session_id: str
-    indices: list[int]
+    indice: int
 
 
-@app.post("/dnrpa/informe/captcha")
-async def dnrpa_informe_captcha(payload: DnrpaCaptchaPayload):
-    return await dnrpa_informe.resolver_captcha(payload.session_id, payload.indices)
+@app.post("/dnrpa/informe/captcha/marcar")
+async def dnrpa_informe_marcar(payload: DnrpaMarcarPayload):
+    """Clickea UNA celda sin verificar todavía -igual que el captcha real,
+    cada toque se refleja al instante en esa celda puntual."""
+    return await dnrpa_informe.marcar_celda(payload.session_id, payload.indice)
+
+
+class DnrpaVerificarPayload(BaseModel):
+    session_id: str
+
+
+@app.post("/dnrpa/informe/captcha/verificar")
+async def dnrpa_informe_verificar(payload: DnrpaVerificarPayload):
+    return await dnrpa_informe.verificar(payload.session_id)
 
 
 # ---------------------------------------------------------------------------

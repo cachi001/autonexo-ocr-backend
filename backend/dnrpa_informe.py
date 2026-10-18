@@ -291,10 +291,48 @@ async def _esperar_bframe(page: Page, timeout_s: float = 8.0):
     return None
 
 
-async def resolver_captcha(session_id: str, indices: list[int]) -> dict:
+def _comprobar_sesion(session_id: str) -> tuple["_Sesion | None", dict | None]:
     sesion = _sesiones.get(session_id)
     if sesion is None:
-        return {"error": "Esa consulta ya expiró o no existe. Empezá de nuevo."}
+        return None, {"error": "Esa consulta ya expiró o no existe. Empezá de nuevo."}
+    return sesion, None
+
+
+async def marcar_celda(session_id: str, indice: int) -> dict:
+    """Clickea UNA celda, sin tocar 'Verificar' -igual que el captcha real de
+    Google: tocar una imagen correcta la reemplaza al toque en esa celda
+    puntual, sin perder las demás ni mandar nada todavía. Devuelve la grilla
+    actualizada (con el reemplazo, si lo hubo) para que se vea en vivo."""
+    sesion, err = _comprobar_sesion(session_id)
+    if err:
+        return err
+    if await _limpiar_si_vencida(sesion):
+        minutos = SESSION_TIMEOUT_SECONDS // 60
+        return {"error": f"Pasaron más de {minutos} minutos sin resolver el captcha. Empezá de nuevo."}
+
+    frame = _bframe(sesion.page)
+    if frame is None:
+        await sesion.cerrar()
+        return {"error": "Se perdió el captcha. Empezá de nuevo."}
+
+    celdas = await frame.query_selector_all("table.rc-imageselect-table-33 td, table.rc-imageselect-table-44 td")
+    if 0 <= indice < len(celdas):
+        await celdas[indice].click()
+    await asyncio.sleep(0.5)
+
+    desafio = await _leer_desafio(frame)
+    if desafio is None:
+        return {"error": "Se perdió el captcha. Probá de nuevo."}
+    return {"session_id": session_id, "desafio": desafio}
+
+
+async def verificar(session_id: str) -> dict:
+    """Recién acá se manda lo marcado -clickea el botón real 'Verificar' de
+    reCAPTCHA. Puede devolver una ronda nueva (si Google pide más) o el
+    resultado final."""
+    sesion, err = _comprobar_sesion(session_id)
+    if err:
+        return err
     if await _limpiar_si_vencida(sesion):
         minutos = SESSION_TIMEOUT_SECONDS // 60
         return {"error": f"Pasaron más de {minutos} minutos sin resolver el captcha. Empezá de nuevo."}
@@ -305,16 +343,9 @@ async def resolver_captcha(session_id: str, indices: list[int]) -> dict:
         await sesion.cerrar()
         return {"error": "Se perdió el captcha. Empezá de nuevo."}
 
-    celdas = await frame.query_selector_all("table.rc-imageselect-table-33 td, table.rc-imageselect-table-44 td")
-    for i in indices:
-        if 0 <= i < len(celdas):
-            await celdas[i].click()
-            await asyncio.sleep(0.2)
-
-    verificar = await frame.query_selector("#recaptcha-verify-button")
-    if verificar is not None:
-        await verificar.click()
-
+    verificar_btn = await frame.query_selector("#recaptcha-verify-button")
+    if verificar_btn is not None:
+        await verificar_btn.click()
     await asyncio.sleep(1.5)
 
     nuevo_desafio = await _leer_desafio(frame) if _bframe(page) else None
