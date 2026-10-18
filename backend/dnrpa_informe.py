@@ -94,7 +94,7 @@ async def _leer_desafio(frame) -> dict | None:
         # En headful/Xvfb el panel tarda más en pintar que en headless -4s se
         # quedaba corto y tiraba "no se pudo leer el captcha" con el desafío
         # todavía cargando (probado en vivo).
-        prompt_el = await frame.wait_for_selector("div.rc-imageselect-desc-no-canonical, div.rc-imageselect-desc", timeout=12000)
+        prompt_el = await frame.wait_for_selector("div.rc-imageselect-desc-no-canonical, div.rc-imageselect-desc", timeout=25000)
     except Exception:
         return None
     prompt = (await prompt_el.inner_text()).replace("\n", " ").strip()
@@ -120,7 +120,9 @@ async def _resultado_o_error(page: Page) -> dict | None:
     y pinta el resultado (o un error) en el DOM -no hace falta replicar esa
     llamada a mano, alcanza con leer lo que ya renderizó."""
     try:
-        detalle = await page.wait_for_selector("text=Detalles del Vehículo", timeout=6000)
+        # Headful/Xvfb en la CPU compartida de Render es bastante más lento
+        # que headless -6s se quedaba corto para que la SPA termine de pintar.
+        detalle = await page.wait_for_selector("text=Detalles del Vehículo", timeout=20000)
     except Exception:
         detalle = None
     if detalle is not None:
