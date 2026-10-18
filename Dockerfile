@@ -2,10 +2,15 @@ FROM python:3.12-slim
 
 # libgl1/libglib2.0-0: opencv-python-headless igual necesita estas libs del
 # sistema en tiempo de ejecución (no solo en build) para decodificar imágenes.
+# xvfb: display virtual para correr Chromium en modo headful real (ver
+# dnrpa_informe.py) -el modo headless, aunque se le parchee el user-agent y
+# el navigator.webdriver, sigue renderizando distinto por dentro (GPU/canvas)
+# y reCAPTCHA Enterprise lo puede detectar igual; probado en vivo sin mejora.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -40,4 +45,6 @@ ENV MIN_OCR_SHORT_SIDE=550
 
 EXPOSE 8000
 WORKDIR /app/backend
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# xvfb-run levanta un display virtual (:99 por defecto) y lo cierra solo al
+# terminar el proceso -Chromium corre headful de verdad contra ese display.
+CMD ["sh", "-c", "xvfb-run -a uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

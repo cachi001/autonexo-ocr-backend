@@ -175,15 +175,16 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
     browser = None
     try:
         playwright = await async_playwright().start()
+        # headless=False (headful real, contra el display virtual Xvfb que
+        # arranca xvfb-run en el Dockerfile): el modo headless, aunque se le
+        # parchee user-agent/navigator.webdriver/CDP (ver stealth abajo),
+        # sigue renderizando distinto por dentro -probado en vivo: con todo
+        # eso aplicado, la cantidad de rondas de captcha no bajó nada. Un
+        # Chromium headful de verdad renderiza igual que el de cualquier
+        # usuario, sin esa diferencia de fondo.
         browser = await playwright.chromium.launch(
-            headless=True,
-            # --disable-blink-features=AutomationControlled apaga la señal de
-            # más bajo nivel que Chrome expone cuando lo maneja CDP (lo que
-            # usa Playwright) -el parche de navigator.webdriver solo no
-            # alcanzó (probado en vivo: 14+ rondas de captcha seguidas sin
-            # cerrar nunca, con categorías rotando, típico de un score de
-            # riesgo que nunca baja del umbral).
-            args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu", "--disable-blink-features=AutomationControlled"],
+            headless=False,
+            args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-blink-features=AutomationControlled"],
         )
         # El humano (empleado de la agencia) sigue resolviendo el captcha de
         # verdad en cada ronda -esto no lo reemplaza, solo deja de delatar
