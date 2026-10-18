@@ -207,9 +207,9 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
         page = await contexto.new_page()
         page.set_default_timeout(45000)
         await page.goto(SITE_URL, wait_until="domcontentloaded")
-        await page.get_by_role("link", name="Informes online").click()
+        await page.get_by_role("link", name="Informes online").click(no_wait_after=True)
         await page.get_by_role("spinbutton", name="CUIL / CUIT").fill(cuit)
-        await page.get_by_role("button", name="Buscar Solicitante").click()
+        await page.get_by_role("button", name="Buscar Solicitante").click(no_wait_after=True)
 
         # El resultado de la búsqueda (encontrado o no) tarda un instante en
         # volver -hay que esperarlo antes de mirar el DOM, si no esta
@@ -240,9 +240,9 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
             await page.locator("#telefonoCelular").fill(alta["celular_numero"])
             await page.locator("#operadorCelular").select_option(alta["celular_operador"])
 
-        await page.get_by_role("button", name="Continuar").click()
+        await page.get_by_role("button", name="Continuar").click(no_wait_after=True)
         await page.get_by_role("textbox", name="Patente").fill(dominio.upper())
-        await page.get_by_role("button", name="Validar Vehículo").click()
+        await page.get_by_role("button", name="Validar Vehículo").click(no_wait_after=True)
 
         session_id = str(uuid.uuid4())
         sesion = _Sesion(session_id, playwright, browser, page)
@@ -320,7 +320,7 @@ async def marcar_celda(session_id: str, indice: int) -> dict:
 
     celdas = await frame.query_selector_all("table.rc-imageselect-table-33 td, table.rc-imageselect-table-44 td")
     if 0 <= indice < len(celdas):
-        await celdas[indice].click()
+        await celdas[indice].click(no_wait_after=True)
     await asyncio.sleep(0.5)
 
     desafio = await _leer_desafio(frame)
@@ -348,7 +348,7 @@ async def verificar(session_id: str) -> dict:
 
     verificar_btn = await frame.query_selector("#recaptcha-verify-button")
     if verificar_btn is not None:
-        await verificar_btn.click()
+        await verificar_btn.click(no_wait_after=True)
     await asyncio.sleep(1.5)
 
     nuevo_desafio = await _leer_desafio(frame) if _bframe(page) else None
