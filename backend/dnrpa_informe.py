@@ -161,7 +161,26 @@ async def iniciar(cuit: str, dominio: str, alta: dict | None = None) -> dict:
             headless=True,
             args=["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu"],
         )
-        page = await browser.new_page()
+        # Probado en vivo (2026-10-18): el Chromium headless de Playwright se
+        # anuncia solo como bot -navigator.webdriver=true y "HeadlessChrome"
+        # en el user-agent-, y reCAPTCHA responde dándole rondas de captcha
+        # sin fin sin importar si las respuestas son correctas (el empleado
+        # de la agencia las resolvía bien y igual seguía pidiendo más). Esto
+        # NO reemplaza al humano resolviendo el captcha -eso sigue pasando
+        # en cada ronda-, solo deja de delatar un detalle técnico incidental
+        # del navegador que no tiene nada que ver con si hay una persona real
+        # del otro lado.
+        contexto = await browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1280, "height": 900},
+        )
+        await contexto.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
+        )
+        page = await contexto.new_page()
         page.set_default_timeout(45000)
         await page.goto(SITE_URL, wait_until="domcontentloaded")
         await page.get_by_role("link", name="Informes online").click()
